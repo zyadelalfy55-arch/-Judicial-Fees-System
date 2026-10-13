@@ -16,9 +16,8 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
-    "baseUrl": ".",
     "paths": {
-      "@domain/*": ["domain/*"]
+      "@domain/*": ["./domain/*"]
     }
   },
   "include": ["src", "domain"]

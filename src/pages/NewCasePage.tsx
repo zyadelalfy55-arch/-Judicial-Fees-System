@@ -3,15 +3,19 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api.ts";
 import { CASE_TYPES, COURTS } from "@domain/catalog.ts";
 import { Button, Card, Field, inputClass } from "../components/ui.tsx";
+import { useAuth } from "../context/AuthContext.tsx";
 
 export function NewCasePage() {
   const navigate = useNavigate();
+  const { user, can } = useAuth();
+  const assignedCourtId = user?.courtId ?? "";
+  const availableCourts = can("security:manage") ? COURTS : COURTS.filter((court) => court.id === assignedCourtId);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     caseNumber: "",
     year: new Date().getFullYear(),
-    courtId: COURTS[0].id,
+    courtId: assignedCourtId || COURTS[0].id,
     caseTypeId: CASE_TYPES[0].id,
     courtLevel: COURTS[0].level,
     plaintiff: "",
@@ -32,7 +36,7 @@ export function NewCasePage() {
             year: Number(form.year),
             representative: form.representative || undefined,
           });
-          navigate(`/cases/${created.id}`);
+          void navigate(`/cases/${created.id}`);
         } catch (err) {
           setError(err instanceof Error ? err.message : "تعذر الإنشاء");
         } finally {
@@ -57,7 +61,7 @@ export function NewCasePage() {
               setForm({ ...form, courtId: court.id, courtLevel: court.level });
             }}
           >
-            {COURTS.map((c) => (
+            {availableCourts.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.nameAr}
               </option>
@@ -83,6 +87,7 @@ export function NewCasePage() {
           <input className={inputClass} value={form.representative} onChange={(e) => setForm({ ...form, representative: e.target.value })} />
         </Field>
       </Card>
+      {!can("security:manage") && !assignedCourtId ? <p role="alert" className="text-return">الحساب غير مرتبط بمحكمة؛ لا يمكن إنشاء قضية قبل إسناد محكمة له.</p> : null}
       {error ? <p className="text-return">{error}</p> : null}
       <Button disabled={busy} type="submit">
         حفظ ومتابعة الوقائع

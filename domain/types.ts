@@ -20,6 +20,9 @@ export type CaseStatus =
   | "APPROVED"
   | "ISSUED";
 export type RoleId =
+  | "citizen"
+  | "admin"
+  | "super_admin"
   | "estimator"
   | "supervisor"
   | "legal_reviewer"
@@ -49,6 +52,9 @@ export type Permission =
   | "users:manage"
   | "security:manage"
   | "dashboard:view"
+  | "dashboard:admin"
+  | "citizen:portal"
+  | "citizen:profile"
   | "services:calculate";
 
 export interface Court {
@@ -133,6 +139,8 @@ export interface TrailStep {
   detailAr: string;
   amount?: Millieme;
   kind: "fact" | "derivation" | "rule" | "gate" | "math";
+  formula?: string;
+  sourceIds?: string[];
 }
 
 export interface CalculationResult {
