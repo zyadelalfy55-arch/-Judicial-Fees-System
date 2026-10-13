@@ -172,7 +172,7 @@ export function calculateFees(input: CalculationInput, rule = resolveEffectiveRu
   const net = Math.max(0, gross - prepaid);
 
   const warnings = [...profileWarnings];
-  if (!rule.verified) warnings.push("UNVERIFIED_RULE_PACK");
+  if (!rule.verified) warnings.push("UNVERIFIED_RULE_PACK", "LEGAL_SOURCE_UNVERIFIED", "REVIEW_REQUIRED");
   if (treatment === "review" || input.claimStructure === "unsure" || input.valueKind === "unknown") {
     warnings.push("REVIEW_REQUIRED");
   }
@@ -180,6 +180,42 @@ export function calculateFees(input: CalculationInput, rule = resolveEffectiveRu
     warnings.push("COURT_LEVEL_MISMATCH");
   }
 
+  const sourceIds = rule.sources.map((source) => source.id);
+  const feeSteps: TrailStep[] = lines.map((line) => {
+    let formula = "";
+    if (line.code === "relative") formula = "قيمة الرسم النسبي = مجموع الشرائح بعد الحد الأدنى/الأقصى والمعاملة المحددة";
+    if (line.code === "fixed") formula = `الرسم الثابت ${rule.fixedFilingFee} مليم × معامل المعاملة`;
+    if (line.code === "services-fund") formula = `(${relativeRaw} مليم × ${rule.servicesFundBps} نقطة أساس) ثم تطبيق المعاملة`;
+    if (line.code === "stamp") formula = `الدمغة ${rule.lawyerStampFee} مليم × معامل المعاملة`;
+    if (line.code === "urgent") formula = `(${relative} + ${fixed}) مليم × ${rule.urgentSurchargeBps} نقطة أساس`;
+    return {
+      id: `fee-${line.code}`,
+      titleAr: line.labelAr,
+      detailAr: `ناتج هذا البند ${line.amount} مليم. ${rule.verified ? "السند مرتبط بإصدار القاعدة." : "لا يوجد سند قانوني معتمد لهذا البند في الملفات المتاحة."}`,
+      formula,
+      amount: line.amount,
+      kind: "math",
+      sourceIds,
+    };
+  });
+  const totalStep: TrailStep = {
+    id: "gross-total",
+    titleAr: "إجمالي البنود",
+    detailAr: "مجموع قيم بنود الرسوم قبل خصم أي مبلغ مسدد مقدمًا.",
+    formula: `${lines.map((line) => line.amount).join(" + ")} = ${gross} مليم`,
+    amount: gross,
+    kind: "math",
+    sourceIds,
+  };
+  const netStep: TrailStep = {
+    id: "net-payable",
+    titleAr: "صافي المبلغ المستحق",
+    detailAr: "لا يقل الصافي عن صفر بعد خصم المقدم المسجل.",
+    formula: `max(0, ${gross} - ${prepaid}) = ${net} مليم`,
+    amount: net,
+    kind: "math",
+    sourceIds,
+  };
   const trail: TrailStep[] = [
     {
       id: "facts",
@@ -207,6 +243,9 @@ export function calculateFees(input: CalculationInput, rule = resolveEffectiveRu
       kind: "gate",
     },
     ...slices,
+    ...feeSteps,
+    totalStep,
+    netStep,
   ];
 
   return {
@@ -233,7 +272,7 @@ export function calculateFees(input: CalculationInput, rule = resolveEffectiveRu
       treatment,
     },
     feeTreatment: treatment,
-    requiresReview: warnings.includes("REVIEW_REQUIRED") || treatment === "review",
+    requiresReview: !rule.verified || warnings.includes("REVIEW_REQUIRED") || treatment === "review",
   };
 }
 

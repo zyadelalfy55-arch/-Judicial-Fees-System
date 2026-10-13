@@ -12,7 +12,7 @@ function loadEnv(): void {
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq).trim();
     const value = trimmed.slice(eq + 1).trim();
-    if (process.env[key] === undefined) process.env[key] = value;
+    process.env[key] ??= value;
   }
 }
 loadEnv();
@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
   display_name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
   password_hash TEXT NOT NULL,
   password_salt TEXT NOT NULL,
   title_ar TEXT NOT NULL,
@@ -125,6 +127,19 @@ CREATE TABLE IF NOT EXISTS service_estimates (
   created_by TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS cases_court_updated_idx ON cases(court_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS cases_creator_updated_idx ON cases(created_by, updated_at DESC);
+CREATE INDEX IF NOT EXISTS estimates_case_version_idx ON estimates(case_id, version DESC);
+`);
+
+const userColumns = new Set(
+  (db.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>).map((column) => column.name),
+);
+if (!userColumns.has("email")) db.exec("ALTER TABLE users ADD COLUMN email TEXT");
+if (!userColumns.has("phone")) db.exec("ALTER TABLE users ADD COLUMN phone TEXT");
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique ON users(email COLLATE NOCASE) WHERE email IS NOT NULL AND email <> '';
+  CREATE UNIQUE INDEX IF NOT EXISTS users_phone_unique ON users(phone) WHERE phone IS NOT NULL AND phone <> '';
 `);
 
 export function nowIso(): string {

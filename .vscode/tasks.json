@@ -22,6 +22,39 @@
 			],
 			"isBackground": true,
 			"problemMatcher": []
+		},
+		{
+			"label": "Audit Legal Source Folder",
+			"type": "shell",
+			"command": ".\\tools\\audit-legal-sources.ps1",
+			"options": {
+				"shell": {
+					"executable": "powershell.exe",
+					"args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]
+				}
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Judicial Fees Tests",
+			"type": "shell",
+			"command": "npm.cmd",
+			"args": ["test"],
+			"problemMatcher": []
+		},
+		{
+			"label": "Judicial Fees Build",
+			"type": "shell",
+			"command": "npm.cmd",
+			"args": ["run", "build"],
+			"problemMatcher": []
+		},
+		{
+			"label": "Inspect Legal Audit Process",
+			"type": "shell",
+			"command": "powershell.exe",
+			"args": ["-NoProfile", "-Command", "Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -eq 26056 -or $_.ProcessId -eq 24028 -or $_.ProcessId -eq 26828 -or $_.ProcessId -eq 11540 } | Select-Object ProcessId,ParentProcessId,Name,CommandLine | Format-List"],
+			"problemMatcher": []
 		}
 	]
 }

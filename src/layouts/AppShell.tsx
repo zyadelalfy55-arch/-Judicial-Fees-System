@@ -18,7 +18,6 @@ import { useState } from "react";
 import { useAuth } from "../context/AuthContext.tsx";
 
 const links = [
-  { to: "/", label: "لوحة العمل", icon: LayoutDashboard, perm: "dashboard:view" as const },
   { to: "/cases", label: "القضايا", icon: FolderOpen, perm: "case:view" as const },
   { to: "/cases/new", label: "إنشاء قضية جديدة", icon: FilePlus, perm: "case:create" as const },
   { to: "/history", label: "سجل التقديرات", icon: History, perm: "calculation:view" as const },
@@ -34,6 +33,17 @@ export function AppShell() {
   const { user, logout, can } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const dashboardLinks = {
+    staff: { to: "/", label: "لوحة العمل", icon: LayoutDashboard, perm: "dashboard:view" as const },
+    citizen: { to: "/citizen", label: "بوابة المواطن", icon: LayoutDashboard, perm: "citizen:portal" as const },
+    admin: { to: "/admin-dashboard", label: "لوحة الإدارة", icon: LayoutDashboard, perm: "dashboard:admin" as const },
+  };
+  let dashboardLink: (typeof dashboardLinks)[keyof typeof dashboardLinks] = dashboardLinks.staff;
+  if (user?.roles.includes("citizen")) {
+    dashboardLink = dashboardLinks.citizen;
+  } else if (can("dashboard:admin")) {
+    dashboardLink = dashboardLinks.admin;
+  }
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -61,7 +71,7 @@ export function AppShell() {
             <span className="text-[11px] font-semibold">نظام تقدير الرسوم القضائية</span>
           </div>
           <nav className="mt-3 flex flex-col gap-1 px-2">
-            {links
+            {[dashboardLink, ...links]
               .filter((l) => can(l.perm) || l.perm === "dashboard:view")
               .filter((l) => (l.perm === "users:manage" || l.perm === "security:manage" ? can(l.perm) : true))
               .map((l) => {
@@ -91,7 +101,7 @@ export function AppShell() {
           <div className="flex items-center justify-between px-1 text-[11px] text-slate-400">
             <span className="flex items-center gap-1">
               <span className="size-2 rounded-full bg-verified" />
-              جلسة عمل آمنة (وضع تجريبي)
+              <span>جلسة عمل آمنة (وضع تجريبي)</span>
             </span>
             <span>v0.1</span>
           </div>
@@ -116,7 +126,7 @@ export function AppShell() {
               className="rounded p-2 text-muted hover:bg-canvas"
               onClick={async () => {
                 await logout();
-                navigate("/login");
+                void navigate("/login");
               }}
               aria-label="خروج"
             >

@@ -3,6 +3,8 @@
 **Date:** 2026-09-23  
 **Mode:** Greenfield (no existing application source in this workspace)
 
+> **Historical snapshot:** This audit records the initial repository state on 2026-09-23. The application source has since been implemented; use [current-status-report.md](current-status-report.md) for the status as of 2026-09-30.
+
 ## Materials inspected
 
 | Asset | Status |

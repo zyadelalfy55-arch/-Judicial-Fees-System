@@ -1,22 +1,41 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api.ts";
 import { useAuth } from "../context/AuthContext.tsx";
 import { Button, Field, inputClass } from "../components/ui.tsx";
-import { COURTS } from "@domain/catalog.ts";
+
+type LoginAudience = "employee" | "admin" | "super_admin" | "citizen";
+
+function roleMatchesAudience(roles: string[], audience: LoginAudience): boolean {
+  switch (audience) {
+    case "employee":
+      return roles.some((role) => ["estimator", "supervisor", "legal_reviewer", "project_manager", "leader"].includes(role));
+    case "admin":
+      return roles.some((role) => ["admin", "system_admin"].includes(role));
+    case "super_admin":
+      return roles.includes("super_admin");
+    case "citizen":
+      return roles.includes("citizen");
+  }
+}
 
 export function LoginPage() {
-  const { user, login } = useAuth();
+  const { user, login, logout, acceptLogin } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState("estimator");
-  const [password, setPassword] = useState("demo-estimator");
-  const [courtId, setCourtId] = useState("cairo-econ");
+  const [audience, setAudience] = useState<LoginAudience>("employee");
+  const [citizenAccountLogin, setCitizenAccountLogin] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  let submitLabel = "تسجيل الدخول للنظام";
+  if (audience === "citizen") submitLabel = "ابدأ كمواطن";
+  if (audience === "citizen" && citizenAccountLogin) submitLabel = "تسجيل الدخول";
+  if (busy) submitLabel = "جاري التحقق…";
 
   useEffect(() => {
-    if (user) navigate("/", { replace: true });
+    if (user) void navigate("/", { replace: true });
   }, [user, navigate]);
 
   return (
@@ -42,11 +61,20 @@ export function LoginPage() {
           className="space-y-4 p-10 lg:col-span-7"
           onSubmit={async (e) => {
             e.preventDefault();
+            if (audience === "citizen" && !citizenAccountLogin) {
+              void navigate("/public/calculator");
+              return;
+            }
             setBusy(true);
             setError("");
             try {
-              await login(username, password, courtId);
-              navigate("/");
+              const authenticated = await login(username, password);
+              if (!roleMatchesAudience(authenticated.roles, audience)) {
+                await logout();
+                throw new Error("نوع الحساب لا يطابق الاختيار. اختر النوع الصحيح أو تواصل مع مسؤول النظام.");
+              }
+              acceptLogin(authenticated);
+              void navigate("/");
             } catch (err) {
               setError(err instanceof Error ? err.message : "تعذر الدخول");
             } finally {
@@ -55,43 +83,53 @@ export function LoginPage() {
           }}
         >
           <div className="flex items-center justify-between text-xs">
-            <span className="font-medium text-verified">وضع التجربة المحلي</span>
+            <span className="font-medium text-verified">دخول موحد</span>
             <button type="button" className="text-muted" onClick={() => void api.health().then(() => undefined)}>
               AUTH-02
             </button>
           </div>
-          <h3 className="text-xl font-semibold text-navy">تسجيل الدخول المؤسسي</h3>
-          <Field label="المحكمة أو الجهة القضائية" required>
-            <select className={inputClass} value={courtId} onChange={(e) => setCourtId(e.target.value)}>
-              {COURTS.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nameAr}
-                </option>
-              ))}
+          <h3 className="text-xl font-semibold text-navy">الدخول إلى المنظومة</h3>
+          <Field label="نوع المستخدم" required>
+            <select className={inputClass} value={audience} onChange={(e) => {
+              setAudience(e.target.value as LoginAudience);
+              setCitizenAccountLogin(false);
+            }}>
+              <option value="employee">موظف</option>
+              <option value="admin">أدمن</option>
+              <option value="super_admin">سوبر أدمن</option>
+              <option value="citizen">مواطن (دخول بدون حساب)</option>
             </select>
           </Field>
-          <Field label="المعرّف الوظيفي (تجريبي)" required hint="مثال: estimator">
-            <input className={inputClass} dir="ltr" value={username} onChange={(e) => setUsername(e.target.value)} />
-          </Field>
-          <Field label="كلمة المرور" required>
-            <div className="relative">
-              <input
-                className={`${inputClass} pl-12`}
-                dir="ltr"
-                type={show ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <button type="button" className="absolute left-2 top-2 text-xs text-muted" onClick={() => setShow((s) => !s)}>
-                {show ? "إخفاء" : "إظهار"}
-              </button>
-            </div>
-          </Field>
-          <p className="text-xs text-muted">الصفة تُستمد من الخادم ولا تُؤخذ من المتصفح. الحسابات التجريبية موثّقة في README.</p>
+          {audience !== "citizen" || citizenAccountLogin ? <>
+            <Field label="اسم المستخدم" required>
+              <input className={inputClass} dir="ltr" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} />
+            </Field>
+            <Field label="كلمة المرور" required>
+              <div className="relative">
+                <input
+                  className={`${inputClass} pl-12`}
+                  dir="ltr"
+                  type={show ? "text" : "password"}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button type="button" className="absolute left-2 top-2 text-xs text-muted" onClick={() => setShow((s) => !s)}>
+                  {show ? "إخفاء" : "إظهار"}
+                </button>
+              </div>
+            </Field>
+            <p className="text-xs text-muted">اختيار النوع لا يمنح صلاحية؛ الخادم يتحقق من الدور المسجل للحساب.</p>
+          </> : <div className="space-y-2 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+            <p>تقدر تبدأ حساب الرسوم مباشرة دون اسم مستخدم أو كلمة مرور. لن يتم حفظ بيانات القضية.</p>
+            <button type="button" className="font-semibold underline" onClick={() => setCitizenAccountLogin(true)}>لدي حساب مواطن مسجل</button>
+          </div>}
+          {audience === "citizen" && citizenAccountLogin ? <button type="button" className="text-sm font-semibold text-cobalt underline" onClick={() => setCitizenAccountLogin(false)}>استخدم الحاسبة بدون حساب</button> : null}
           {error ? <div className="rounded bg-return-bg p-2 text-sm text-return">{error}</div> : null}
           <Button className="h-12 w-full" disabled={busy} type="submit">
-            {busy ? "جاري التحقق…" : "تسجيل الدخول للنظام"}
+            {submitLabel}
           </Button>
+          <p className="text-center text-sm text-muted">مواطن جديد؟ <Link className="font-semibold text-cobalt underline" to="/register">إنشاء حساب مواطن</Link></p>
         </form>
       </div>
     </div>

@@ -11,7 +11,16 @@ export interface SessionUser {
   roles: RoleId[];
 }
 
-const secret = new TextEncoder().encode(process.env.SESSION_SECRET ?? "dev-only-change-me-please-32chars!!");
+function sessionSecret(): Uint8Array {
+  const configured = process.env.SESSION_SECRET;
+  const production = process.env.NODE_ENV === "production" || process.env.APP_MODE === "production";
+  const value = configured ?? "dev-only-change-me-please-32chars!!";
+  if (production && (!configured || value === "dev-only-change-me-please-32chars!!" || /^(change-me|replace-this)/i.test(value))) {
+    throw new Error("Set a private, non-example SESSION_SECRET before production startup.");
+  }
+  if (value.length < 32) throw new Error("SESSION_SECRET must be at least 32 characters.");
+  return new TextEncoder().encode(value);
+}
 
 export function hashPassword(password: string, salt = crypto.randomBytes(16).toString("hex")): { hash: string; salt: string } {
   const hash = crypto.scryptSync(password, salt, 64).toString("hex");
@@ -35,13 +44,19 @@ export async function signSession(user: SessionUser): Promise<string> {
     roles: user.roles,
   })
     .setProtectedHeader({ alg: "HS256" })
+    .setIssuer("judicial-fees-system")
+    .setAudience("judicial-fees-web")
     .setIssuedAt()
     .setExpirationTime("8h")
-    .sign(secret);
+    .sign(sessionSecret());
 }
 
 export async function readSession(token: string): Promise<SessionUser> {
-  const { payload } = await jwtVerify(token, secret);
+  const { payload } = await jwtVerify(token, sessionSecret(), {
+    issuer: "judicial-fees-system",
+    audience: "judicial-fees-web",
+    algorithms: ["HS256"],
+  });
   return {
     id: String(payload.sub),
     username: String(payload.username),

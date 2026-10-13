@@ -49,6 +49,12 @@ export function ResultPage() {
           القاعدة: {r.ruleSetId} / {r.ruleSetVersion}
         </p>
       </Card>
+      <Card className="p-5">
+        <h2 className="mb-3 font-semibold">الخلاصة بلغة مبسطة</h2>
+        <p className="text-sm leading-7 text-muted">{r.computationTrail.find((step) => step.id === "facts")?.detailAr}</p>
+        <p className="mt-2 text-sm leading-7 text-muted">{r.computationTrail.find((step) => step.id === "basis")?.detailAr}</p>
+        <p className="mt-2 text-sm font-semibold">الصافي يحسب بطرح المقدم من مجموع البنود، بحد أدنى صفر.</p>
+      </Card>
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
           <h2 className="mb-3 font-semibold">بنود الرسم</h2>
@@ -71,7 +77,9 @@ export function ResultPage() {
               <li key={s.id} className="rounded border border-border p-2">
                 <div className="font-semibold">{s.titleAr}</div>
                 <div className="text-muted">{s.detailAr}</div>
+                {s.formula ? <code className="mt-2 block whitespace-normal rounded bg-canvas p-2 text-xs text-navy" dir="auto">{s.formula}</code> : null}
                 {s.amount != null ? <div className="tabular-nums">{formatEgpDisplay(s.amount)}</div> : null}
+                {s.sourceIds?.map((sourceId) => <div key={sourceId} className="mt-1 text-xs text-pending">معرّف المصدر: {sourceId}</div>)}
               </li>
             ))}
           </ol>
@@ -86,7 +94,7 @@ export function ResultPage() {
         </ul>
         {r.sources.map((s) => (
           <p key={s.id} className="mt-2 rounded bg-pending-bg p-3 text-sm">
-            {s.citationAr} {s.verified ? "" : "— غير موثّق"}
+            {s.citationAr} {s.verified ? "— موثّق" : "— غير موثّق؛ يلزم إرفاق القانون والمادة والصفحة واعتمادها"}
           </p>
         ))}
       </Card>

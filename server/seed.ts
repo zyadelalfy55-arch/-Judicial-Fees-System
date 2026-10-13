@@ -69,7 +69,12 @@ const DEMO_USERS: Array<{
   },
 ];
 
+export function isDemoUserId(id: string): boolean {
+  return DEMO_USERS.some((user) => user.id === id);
+}
+
 export function seedIfEmpty(): void {
+  if (process.env.NODE_ENV === "production" || process.env.APP_MODE === "production") return;
   const row = db.prepare("SELECT COUNT(*) AS c FROM users").get() as { c: number };
   if (row.c > 0) return;
   const insertUser = db.prepare(
@@ -112,4 +117,29 @@ export function seedIfEmpty(): void {
     entity: "system",
     payload: { mode: process.env.APP_MODE ?? "demo" },
   });
+}
+
+export function bootstrapSuperAdmin(): void {
+  const username = process.env.BOOTSTRAP_SUPER_ADMIN_USERNAME?.trim().toLowerCase();
+  const password = process.env.BOOTSTRAP_SUPER_ADMIN_PASSWORD;
+  const displayName = process.env.BOOTSTRAP_SUPER_ADMIN_DISPLAY_NAME?.trim();
+  const configured = [username, password, displayName].filter(Boolean).length;
+  if (configured === 0) return;
+  if (configured !== 3 || !/^[a-z0-9._-]{3,40}$/.test(username!) || password!.length < 14) {
+    throw new Error("Configure a valid bootstrap username, display name, and password of at least 14 characters.");
+  }
+  const active = db.prepare("SELECT COUNT(*) AS count FROM users u JOIN user_roles r ON r.user_id=u.id WHERE r.role_id='super_admin' AND u.active=1").get() as { count: number };
+  if (active.count > 0) return;
+  const existing = db.prepare("SELECT id FROM users WHERE username=? COLLATE NOCASE").get(username);
+  if (existing) throw new Error("Bootstrap username already exists; choose a different username.");
+  const id = crypto.randomUUID();
+  const { hash, salt } = hashPassword(password!);
+  db.transaction(() => {
+    db.prepare(
+      `INSERT INTO users (id, username, display_name, email, phone, password_hash, password_salt, title_ar, court_id, active)
+       VALUES (?, ?, ?, NULL, NULL, ?, ?, 'مدير النظام الأعلى', NULL, 1)`,
+    ).run(id, username, displayName, hash, salt);
+    db.prepare("INSERT INTO user_roles (user_id, role_id) VALUES (?, 'super_admin')").run(id);
+    appendAudit({ actorId: id, action: "user.bootstrap-super-admin", entity: "user", entityId: id, payload: { username } });
+  })();
 }

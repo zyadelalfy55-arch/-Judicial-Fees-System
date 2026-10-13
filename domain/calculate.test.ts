@@ -45,6 +45,8 @@ describe("golden calculation", () => {
     expect(relative).toBe(egpToMillieme(74_350));
     expect(result.ruleSetId).toBe(DEMO_RULE.ruleSetId);
     expect(result.warnings).toContain("UNVERIFIED_RULE_PACK");
+    expect(result.requiresReview).toBe(true);
+    expect(result.computationTrail.some((step) => step.id === "net-payable" && step.formula?.includes("max(0,"))).toBe(true);
     expect(result.total).toBeGreaterThan(relative);
   });
 
